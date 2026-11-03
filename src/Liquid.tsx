@@ -18,24 +18,24 @@ export default function Liquid() {
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(34, 1, .1, 50);
-    camera.position.set(0, 0, 9.4);
+    camera.position.set(0, 0, 12.4);
     const pmrem = new THREE.PMREMGenerator(renderer);
     const room = new RoomEnvironment();
     const environment = pmrem.fromScene(room, .04);
     scene.environment = environment.texture;
     pmrem.dispose(); room.dispose();
     const group = new THREE.Group();
-    group.rotation.set(-.25, -.4, -.48); scene.add(group);
+    group.rotation.set(-.15, -.2, -.25); scene.add(group);
     const time = { value: 0 };
     const resources: { geometry: THREE.PlaneGeometry; material: THREE.MeshPhysicalMaterial }[] = [];
-    const palette = ['#057fcb', '#14b987', '#63dfd0', '#0b466c'];
-    for (let i = 0; i < 4; i++) {
+    const palette = ['#83b3c0', '#7dada1'];
+    for (let i = 0; i < 2; i++) {
       const geometry = new THREE.PlaneGeometry(2, 2, mobile ? 80 : 130, 22);
       const material = new THREE.MeshPhysicalMaterial({
-        color: palette[i], metalness: .42, roughness: .2,
+        color: palette[i], metalness: .88, roughness: .075,
         clearcoat: 1, clearcoatRoughness: .13,
-        transmission: mobile ? 0 : .3, thickness: .55, ior: 1.4,
-        side: THREE.DoubleSide, envMapIntensity: 1.7,
+        transmission: mobile ? 0 : .35, thickness: .3, ior: 1.35,
+        side: THREE.DoubleSide, envMapIntensity: 2.2,
       });
       material.onBeforeCompile = shader => {
         shader.uniforms.uTime = time;
@@ -43,11 +43,13 @@ export default function Liquid() {
         shader.vertexShader = `uniform float uTime; uniform float uPhase;
           vec3 wavePoint(vec2 p) {
             float u = p.x; float v = p.y;
-            float phase = u * 2.15 + uTime * .38 + uPhase;
-            float twist = sin(u * 1.7 + uPhase + uTime * .16) * 1.35;
-            float width = .55 + .18 * cos(u * 2.5 + uPhase);
-            return vec3(u * 4.8, sin(phase) * .7 + v * width * cos(twist),
-              cos(phase * .85) * .65 + v * width * sin(twist));
+            float phase = u * 2.4 + uTime * .12 + uPhase;
+            float twist = sin(u * 2.2 + uPhase + uTime * .1) * 1.6 + sin(u * 5.5 + uTime * .12) * .35;
+            float taper = pow(max(0., 1. - u * u), .65);
+            float width = (.16 + .22 * cos(u * 2. + uPhase)) * taper;
+            if (uPhase > .5) return vec3(u * 3.4, -.7 + cos(u * 2.) * .65 + v * width * cos(twist), sin(phase) * .45 + v * width * sin(twist));
+            return vec3(.7 + sin(phase) * 1.65 + v * width * cos(twist),
+              u * 3.3 + v * width * sin(twist), cos(phase * .85) * .7);
           }
           ${shader.vertexShader}`;
         shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
@@ -61,19 +63,20 @@ export default function Liquid() {
       };
       const ribbon = new THREE.Mesh(geometry, material);
       ribbon.frustumCulled = false;
-      ribbon.position.set(0, (i - 1.5) * .64, (i - 1.5) * -.2);
+      ribbon.position.set(i === 0 ? .5 : -.2, i === 0 ? .5 : -1.5, -.4 * i);
+      ribbon.rotation.z = i === 0 ? -.18 : -.08;
       group.add(ribbon); resources.push({ geometry, material });
     }
     const key = new THREE.RectAreaLight('#c1f8ff', 10, 7, 3);
     key.position.set(0, 4, 4); key.lookAt(0, 0, 0); scene.add(key);
-    const blue = new THREE.PointLight('#006aff', 38, 16);
+    const blue = new THREE.PointLight('#006aff', 12, 16);
     blue.position.set(-3, 1, 3); scene.add(blue);
-    const green = new THREE.PointLight('#3fffc4', 32, 16);
+    const green = new THREE.PointLight('#3fffc4', 9, 16);
     green.position.set(3, -1, 3); scene.add(green);
     const target = { x: 0, y: 0 };
     const pointer = (e: PointerEvent) => {
-      target.x = (e.clientX / innerWidth - .5) * .22;
-      target.y = (e.clientY / innerHeight - .5) * .16;
+      target.x = (e.clientX / innerWidth - .5) * .1;
+      target.y = (e.clientY / innerHeight - .5) * .08;
     };
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     if (!reduced.matches && !mobile) window.addEventListener('pointermove', pointer, { passive: true });
@@ -94,9 +97,9 @@ export default function Liquid() {
       if (!visible || document.hidden || (reduced.matches && !needsRender)) return;
       if (!reduced.matches) elapsed += delta;
       time.value = elapsed;
-      group.rotation.y += (-.4 + target.x - group.rotation.y) * .035;
-      group.rotation.x += (-.25 + target.y - group.rotation.x) * .035;
-      group.position.y = Math.sin(elapsed * .23) * .12;
+      group.rotation.y += (-.2 + target.x - group.rotation.y) * .035;
+      group.rotation.x += (-.15 + target.y - group.rotation.x) * .035;
+      group.position.y = Math.sin(elapsed * .18) * .06;
       renderer.render(scene, camera); needsRender = false;
     }
     frame = requestAnimationFrame(draw);
