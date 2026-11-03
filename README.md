@@ -20,7 +20,7 @@ A saída está em `dist/`. O comando de build também verifica os tipos TypeScri
 
 ## Conteúdo oficial a conectar
 
-- Substituir o lettering tipográfico pelo arquivo oficial do logotipo, se fornecido.
+- O cabeçalho usa `public/logounda.jpg`, uma cópia inalterada da logo original fornecida. A imagem preserva as cores e a proporção; o contêiner recorta apenas as margens vazias do JPG.
 - Substituir a galeria conceitual (fotografias do Unsplash) pelos trabalhos autorizados da UNDA. As referências estão identificadas na interface e não são apresentadas como trabalhos reais.
 - Conectar o showreel oficial. O vídeo atual é uma referência de atmosfera do Pexels, identificada no player, e não uma produção da UNDA.
 - Configurar o WhatsApp comercial após receber o número com código do país e DDD. Hoje o botão prepara uma solicitação do contato pelo Instagram, explicitamente indicada na interface.
@@ -30,4 +30,6 @@ Instagram oficial: https://www.instagram.com/unda.studios/
 
 ## Acessibilidade e desempenho
 
-Navegação por teclado, diálogos nativos com Escape, preferências de movimento reduzido, imagens com carregamento progressivo, Three.js em módulo separado e limite de resolução e atualização do WebGL. O vídeo ambiente carrega apenas em telas maiores sem preferência por movimento reduzido. O conteúdo permanece navegável sem WebGL.
+Navegação por teclado, diálogos nativos com Escape, preferências de movimento reduzido, imagens com carregamento progressivo e Three.js em módulo separado. O Hero usa ondas calculadas na GPU, limita a resolução e a atualização a 30 fps e interrompe a renderização fora da tela. Em celulares, usa menos subdivisões e dispensa a passagem de transmissão. O conteúdo permanece navegável sem WebGL.
+
+O Hero está em `src/Hero.tsx`, com estilos locais em `src/hero.css`. A cena de fitas líquidas está em `src/Liquid.tsx`. As outras seções permanecem em `src/main.tsx`.

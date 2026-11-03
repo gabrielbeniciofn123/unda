@@ -1,10 +1,10 @@
-import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowUpRight, ArrowDown, Play, X, Menu, Instagram, Plus, Minus, Pause, Volume2, VolumeX, Check, Copy } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import './style.css';
-const Liquid = lazy(() => import('./Liquid'));
+import Hero, { OriginalLogo } from './Hero';
 gsap.registerPlugin(ScrollTrigger);
 const instagram = 'https://www.instagram.com/unda.studios/';
 const photo = (id:string, w=1200) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=85`;
@@ -22,26 +22,21 @@ const services = [
 ];
 
 function App(){
- const [motionVideo,setMotionVideo]=useState(false);
- useEffect(()=>{setMotionVideo(window.matchMedia('(min-width: 900px) and (prefers-reduced-motion: no-preference)').matches)},[]);
  const [menu,setMenu]=useState(false), [filter,setFilter]=useState('Todos'), [active,setActive]=useState<number|null>(null), [service,setService]=useState<number|null>(0), [reel,setReel]=useState(false), [copied,setCopied]=useState(false), [paused,setPaused]=useState(false), [muted,setMuted]=useState(true);
  const [draft,setDraft]=useState(''); const video=useRef<HTMLVideoElement>(null); const modal=useRef<HTMLDialogElement>(null); const projectModal=useRef<HTMLDialogElement>(null);
- useEffect(()=>{const ctx=gsap.context(()=>{gsap.from('.hero-copy > *',{y:45,opacity:0,duration:1,stagger:.14,ease:'power3.out'});gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach(el=>gsap.from(el,{y:45,opacity:0,duration:.8,scrollTrigger:{trigger:el,start:'top 92%',once:true}}));});return ()=>ctx.revert()},[]);
+ useEffect(()=>{const media=gsap.matchMedia();media.add('(prefers-reduced-motion: no-preference)',()=>{gsap.from('.hero-copy > *',{y:30,opacity:0,duration:1.2,stagger:.14,ease:'power3.out'});gsap.from('.unda-header > *',{y:-12,opacity:0,duration:1,stagger:.08,ease:'power2.out'});gsap.to('.unda-hero .hero-copy',{y:-55,opacity:.3,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom 20%',scrub:1}});gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach(el=>gsap.from(el,{y:45,opacity:0,duration:.8,scrollTrigger:{trigger:el,start:'top 92%',once:true}}));});return ()=>media.revert()},[]);
  useEffect(()=>{if(reel)modal.current?.showModal();else modal.current?.close()},[reel]);
  useEffect(()=>{if(active!==null)projectModal.current?.showModal();else projectModal.current?.close()},[active]);
  useEffect(()=>{document.body.style.overflow=menu||reel||active!==null?'hidden':'';return()=>{document.body.style.overflow=''}},[menu,reel,active]);
  function prepare(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const d=new FormData(e.currentTarget);const message=`Olá, UNDA! Sou ${d.get('nome')}.\nE-mail: ${d.get('email')}\nProjeto: ${d.get('tipo')}\n\n${d.get('mensagem')}`;setDraft(message);setCopied(false)}
  async function copy(){try{await navigator.clipboard.writeText(draft);setCopied(true)}catch{setCopied(false)}}
- const nav=[['Trabalhos','#portfolio'],['O estúdio','#sobre'],['O que fazemos','#servicos']];
+ const nav=[['Início','#inicio'],['Projetos','#portfolio'],['Sobre','#sobre'],['Serviços','#servicos'],['Contato','#contato']];
  return <>
   <a className="skip-link" href="#main">Ir para o conteúdo</a>
-  <header className="header"><a href="#" className="logo" aria-label="UNDA Studios, início">unda<span>STUDIOS®</span></a><nav aria-label="Navegação principal">{nav.map(([name,url])=><a key={url} href={url}>{name}</a>)}</nav><a className="header-cta" href="#contato">Vamos criar <ArrowUpRight size={16}/></a><button className="menu-toggle icon-button" aria-label={menu?'Fechar menu':'Abrir menu'} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></header>
-  {menu&&<nav className="mobile-menu">{[...nav,['Contato','#contato']].map(([name,url])=><a key={url} href={url} onClick={()=>setMenu(false)}>{name}<ArrowUpRight/></a>)}<a href={instagram} target="_blank" rel="noreferrer">Instagram <Instagram/></a></nav>}
+  <header className="header unda-header"><OriginalLogo/><nav aria-label="Navegação principal">{nav.map(([name,url])=><a key={url} href={url}>{name}</a>)}</nav><a className="header-cta" href={instagram} target="_blank" rel="noreferrer">NOS SIGA <ArrowUpRight size={16}/></a><button className="menu-toggle icon-button" aria-label={menu?'Fechar menu':'Abrir menu'} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></header>
+  {menu&&<nav className="mobile-menu unda-mobile-menu" aria-label="Navegação móvel">{nav.map(([name,url])=><a key={url} href={url} onClick={()=>setMenu(false)}>{name}<ArrowUpRight/></a>)}<a href={instagram} target="_blank" rel="noreferrer">Instagram <Instagram/></a></nav>}
   <main id="main">
-   <section className="hero" aria-labelledby="hero-title"><img className="hero-image" src={photo('photo-1470229722913-7c0e2dbbafd3',2000)} alt="Luzes e silhuetas em uma apresentação musical" fetchPriority="high"/>{motionVideo&&<video className="hero-image hero-video" autoPlay muted loop playsInline preload="none" aria-hidden="true"><source src="https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4" type="video/mp4"/></video>}<div className="hero-shade"/><div className="hero-grid"/><div className="hero-top"><span><i className="status-dot"/> INDEPENDENT AUDIOVISUAL STUDIO</span><span>BELO HORIZONTE, BR — 19°55′ S 43°56′ W</span></div>
-   <div className="hero-copy"><p className="eyebrow">NASCEMOS PARA CRIAR. EXISTIMOS PARA MOVER.</p><h1 id="hero-title">IMAGENS<br/>QUE <span>MOVEM.</span><sup>®</sup></h1><div className="hero-description"><p>Transformamos ideias em imagens.<br/>E imagens em algo que você sente.</p><a className="circle-link" href="#portfolio" aria-label="Explorar trabalhos"><ArrowDown size={24}/></a></div><a className="hero-work-link" href="#portfolio">EXPLORE NOSSO UNIVERSO <ArrowUpRight size={16}/></a></div>
-   <div className="liquid-art" aria-hidden="true"><Suspense fallback={<div className="liquid-fallback"/>}><Liquid/></Suspense></div><span className="art-caption">FIG. 01 — IDEAS IN A FLUID STATE</span>
-   <div className="hero-bottom"><span>CRIATIVIDADE SEM LIMITES. IMAGENS COM PROPÓSITO.</span><button className="reel-trigger" onClick={()=>setReel(true)}><span className="play-small"><Play fill="currentColor" size={11}/></span> ENTRE NO NOSSO RITMO <span className="muted">/ FILME CONCEITO</span></button><span className="scroll-label">SCROLL TO FEEL <ArrowDown size={13}/></span></div></section>
+   <Hero onReel={()=>setReel(true)}/>
    <div className="ticker" aria-hidden="true"><div>{Array.from({length:4},(_,i)=><span key={i}>FEITO PARA SENTIR <span className="asterisk">✳</span> CRIADO PARA MOVER <span className="asterisk">✳</span></span>)}</div></div>
    <section className="portfolio section" id="portfolio"><div className="section-top" data-reveal><span className="eyebrow">01 / NOSSO UNIVERSO</span><span className="micro">IDEIAS QUE GANHAM VIDA.</span></div><div className="section-heading" data-reveal><h2>PLAY. SINTA.<br/><span className="serif">REPLAY.</span></h2><div className="section-intro"><p>Cada história tem seu próprio ritmo.<br/>A gente encontra o jeito de fazer você sentir.</p><a className="text-link" href={instagram} target="_blank" rel="noreferrer">TRABALHOS REAIS NO INSTAGRAM <ArrowUpRight size={16}/></a></div></div>
    <div className="portfolio-toolbar"><div className="filters" aria-label="Filtrar galeria">{['Todos','Eventos','Música','Marcas'].map(f=><button key={f} className={filter===f?'selected':''} aria-pressed={filter===f} onClick={()=>setFilter(f)}>{f}{f==='Todos'&&<sup>04</sup>}</button>)}</div><span className="micro visual-note">SELEÇÃO VISUAL CONCEITUAL</span></div>
