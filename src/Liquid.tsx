@@ -53,12 +53,13 @@ function studioEnvironment(renderer: THREE.WebGLRenderer) {
     panel.position.set(position[0], position[1], position[2]);
     panel.lookAt(0, 0, 0); studio.add(panel); resources.push({ geometry, material });
   }
-  softbox('#efffff', 5, 2.5, 10, [-4, 3, 4]);
-  softbox('#058fff', 3, 1.4, 12, [5, 0, 1]);
-  softbox('#3df4c2', 2.4, 8, 2, [0, -5, 2]);
+  softbox('#efffff', 4.6, 2.1, 10, [-4, 3, 4]);
+  softbox('#119cf5', 2.8, 1.7, 12, [5, 0, 1]);
+  softbox('#46edc1', 2.2, 8, 2.3, [0, -5, 2]);
   softbox('#b9efff', 4, 9, .8, [0, 5, -3]);
+  softbox('#e4fff8', 1.4, .45, 6, [-1, .7, -5]);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const environment = pmrem.fromScene(studio, .04, .1, 50);
+  const environment = pmrem.fromScene(studio, .055, .1, 50);
   pmrem.dispose();
   resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); });
   studio.clear();
@@ -74,6 +75,7 @@ export default function Liquid() {
     catch { el.classList.add('wave-fallback'); return; }
     const mobile = matchMedia('(max-width: 700px)').matches;
     renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.15 : 1.5));
+    renderer.transmissionResolutionScale = mobile ? .55 : .8;
     renderer.setClearColor('#020405', 1);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
@@ -97,22 +99,42 @@ export default function Liquid() {
       const geometry = glassVolume(shape.points, shape.width, shape.depth, mobile);
       const material = new THREE.MeshPhysicalMaterial({
         color: i === 0 ? '#e0f6ff' : '#dcfff2',
-        metalness: 0, roughness: .065, transmission: .96,
-        thickness: .75, ior: 1.46, dispersion: .025,
+        metalness: 0, roughness: .06, transmission: .97,
+        thickness: .68, ior: 1.45, dispersion: mobile ? 0 : .018,
         attenuationColor: new THREE.Color(i === 0 ? '#72d9e9' : '#65d9b1'),
-        attenuationDistance: 3.5, envMapIntensity: 1.9,
-        clearcoat: 1, clearcoatRoughness: .06,
+        attenuationDistance: 4.2, envMapIntensity: 1.8,
+        clearcoat: 1, clearcoatRoughness: .07,
         side: THREE.FrontSide,
       });
       material.onBeforeCompile = shader => {
         shader.uniforms.uFlowTime = time;
-        shader.vertexShader = 'uniform float uFlowTime;\n' + shader.vertexShader;
-        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
-          vec3 transformed = position + normal * (
-            sin(position.y * 1.2 + uFlowTime * .22) * .022 +
-            cos(position.x * 1.4 + uFlowTime * .17) * .016
-          );
-        `);
+        shader.vertexShader = `
+          uniform float uFlowTime;
+          vec3 liquidFlow(vec3 p) {
+            return p + vec3(
+              .055 * sin(p.y * .9 + uFlowTime * .19),
+              .025 * sin(p.x * 1.1 + uFlowTime * .14),
+              .065 * sin(p.y * .7 + p.x * .65 + uFlowTime * .17)
+            );
+          }
+          mat3 liquidJacobian(vec3 p) {
+            float dz = .065 * cos(p.y * .7 + p.x * .65 + uFlowTime * .17);
+            return mat3(
+              vec3(1., .0275 * cos(p.x * 1.1 + uFlowTime * .14), dz * .65),
+              vec3(.0495 * cos(p.y * .9 + uFlowTime * .19), 1., dz * .7),
+              vec3(0., 0., 1.)
+            );
+          }
+        ` + shader.vertexShader;
+        // Transform normals with the flow's inverse-transpose Jacobian, keeping
+        // highlights attached to the deforming glass rather than a static tube.
+        shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
+          #include <beginnormal_vertex>
+          mat3 flowJ = liquidJacobian(position);
+          objectNormal = normalize(mat3(
+            cross(flowJ[1], flowJ[2]), cross(flowJ[2], flowJ[0]), cross(flowJ[0], flowJ[1])
+          ) * objectNormal);
+        `).replace('#include <begin_vertex>', 'vec3 transformed = liquidFlow(position);');
       };
       const mesh = new THREE.Mesh(geometry, material);
       group.add(mesh);
@@ -124,42 +146,65 @@ export default function Liquid() {
     rim.position.set(4, 0, 3); rim.lookAt(0, 0, 0); scene.add(rim);
     const low = new THREE.PointLight('#39e7b0', 7, 15);
     low.position.set(0, -4, 3); scene.add(low);
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     const target = { x: 0, y: 0 };
     const pointer = (e: PointerEvent) => {
+      if (reduced.matches || e.pointerType === 'touch') return;
       target.x = (e.clientX / innerWidth - .5) * .08;
       target.y = (e.clientY / innerHeight - .5) * .06;
     };
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-    if (!reduced.matches && !mobile) window.addEventListener('pointermove', pointer, { passive: true });
-    let visible = true, frame = 0, last = 0, elapsed = 0, needsRender = true;
+    const resetPointer = () => { target.x = 0; target.y = 0; };
+    if (!mobile) {
+      window.addEventListener('pointermove', pointer, { passive: true });
+      document.documentElement.addEventListener('pointerleave', resetPointer);
+    }
+    let visible = true, frame: number | null = null, last = 0, elapsed = 0, needsRender = true;
+    function schedule() {
+      if (frame === null && visible && !document.hidden) frame = requestAnimationFrame(draw);
+    }
+    function stop() {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null; last = 0;
+    }
+    const invalidate = () => { needsRender = true; schedule(); };
     const resize = new ResizeObserver(() => {
       const w = el.clientWidth, h = el.clientHeight;
       if (!w || !h) return;
-      renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); needsRender = true;
+      renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); invalidate();
     });
     resize.observe(el);
-    const visibility = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; });
+    const visibility = new IntersectionObserver(entries => {
+      visible = entries[0].isIntersecting;
+      if (visible) invalidate(); else stop();
+    });
     visibility.observe(el);
-    const invalidate = () => { needsRender = true; };
     reduced.addEventListener('change', invalidate);
+    const tabVisibility = () => { if (document.hidden) stop(); else invalidate(); };
+    document.addEventListener('visibilitychange', tabVisibility);
     function draw(now: number) {
-      frame = requestAnimationFrame(draw);
-      const delta = Math.min((now - last) / 1000, .05);
-      if (now - last < 1000 / 30) return;
+      frame = null;
+      if (!visible || document.hidden) return;
+      if (last && now - last < 1000 / 30 - .8) { schedule(); return; }
+      const delta = last ? Math.min((now - last) / 1000, .05) : 1 / 30;
       last = now;
-      if (!visible || document.hidden || (reduced.matches && !needsRender)) return;
+      if (reduced.matches && !needsRender) return;
       if (!reduced.matches) elapsed += delta;
       time.value = elapsed;
-      group.rotation.y += (target.x - group.rotation.y) * .035;
-      group.rotation.x += (target.y - group.rotation.x) * .035;
-      group.position.y = Math.sin(elapsed * .16) * .065;
+      const ease = 1 - Math.exp(-delta * 1.8);
+      const sway = reduced.matches ? 0 : Math.sin(elapsed * .11) * .012;
+      group.rotation.y += (target.x + sway - group.rotation.y) * ease;
+      group.rotation.x += (target.y - group.rotation.x) * ease;
+      group.position.y = Math.sin(elapsed * .14) * .055;
       resources[1].mesh.rotation.z = Math.sin(elapsed * .12) * .015;
       renderer.render(scene, camera); needsRender = false;
+      if (!reduced.matches) schedule();
     }
-    frame = requestAnimationFrame(draw);
+    schedule();
     return () => {
-      cancelAnimationFrame(frame); resize.disconnect(); visibility.disconnect();
+      stop(); resize.disconnect(); visibility.disconnect();
       window.removeEventListener('pointermove', pointer);
+      document.documentElement.removeEventListener('pointerleave', resetPointer);
+      document.removeEventListener('visibilitychange', tabVisibility);
       reduced.removeEventListener('change', invalidate);
       resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); });
       environment.dispose(); renderer.dispose(); renderer.domElement.remove();

@@ -15,6 +15,7 @@ export default function Hero() {
     <div className="hero-atmosphere" aria-hidden="true" />
     <div className="hero-audience" aria-hidden="true" />
     <div className="hero-grain" aria-hidden="true" />
+    <div className="hero-depth" aria-hidden="true" />
     <div className="liquid-art" aria-hidden="true">
       <Suspense fallback={<div className="wave-fallback" />}><Liquid /></Suspense>
     </div>

@@ -24,7 +24,22 @@ const services = [
 function App(){
  const [menu,setMenu]=useState(false), [filter,setFilter]=useState('Todos'), [active,setActive]=useState<number|null>(null), [service,setService]=useState<number|null>(0), [reel,setReel]=useState(false), [copied,setCopied]=useState(false), [paused,setPaused]=useState(false), [muted,setMuted]=useState(true);
  const [draft,setDraft]=useState(''); const video=useRef<HTMLVideoElement>(null); const modal=useRef<HTMLDialogElement>(null); const projectModal=useRef<HTMLDialogElement>(null);
- useEffect(()=>{const media=gsap.matchMedia();media.add('(prefers-reduced-motion: no-preference)',()=>{gsap.from('.hero-copy > *',{y:30,opacity:0,duration:1.2,stagger:.14,ease:'power3.out'});gsap.from('.unda-header > *',{y:-12,opacity:0,duration:1,stagger:.08,ease:'power2.out'});gsap.to('.unda-hero .hero-copy',{y:-55,opacity:.3,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom 20%',scrub:1}});gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach(el=>gsap.from(el,{y:45,opacity:0,duration:.8,scrollTrigger:{trigger:el,start:'top 92%',once:true}}));});return ()=>media.revert()},[]);
+ useEffect(()=>{
+  const media=gsap.matchMedia();
+  media.add('(prefers-reduced-motion: no-preference)',()=>{
+   const entry=gsap.timeline({defaults:{ease:'power3.out'}});
+   entry.from('.unda-header > *',{y:-10,opacity:0,duration:.9,stagger:.07},0)
+    .from('.hero-identification',{y:14,opacity:0,duration:.85},.15)
+    .from('.hero-line',{y:22,opacity:0,duration:1.1,stagger:.12},.25)
+    .from('.hero-description, .hero-actions',{y:15,opacity:0,duration:.9,stagger:.12},.55)
+    .from('.hero-bottom',{opacity:0,duration:1},.85);
+   gsap.to('.unda-hero .hero-copy',{y:-45,opacity:.35,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom 20%',scrub:1.2}});
+   gsap.to('.unda-hero .liquid-art',{y:34,scale:1.025,opacity:.8,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom top',scrub:1.3}});
+   gsap.to('.unda-hero .hero-depth',{y:-25,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom top',scrub:1.5}});
+   gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach(el=>gsap.from(el,{y:45,opacity:0,duration:.8,scrollTrigger:{trigger:el,start:'top 92%',once:true}}));
+  });
+  return ()=>media.revert();
+ },[]);
  useEffect(()=>{if(reel)modal.current?.showModal();else modal.current?.close()},[reel]);
  useEffect(()=>{if(active!==null)projectModal.current?.showModal();else projectModal.current?.close()},[active]);
  useEffect(()=>{document.body.style.overflow=menu||reel||active!==null?'hidden':'';return()=>{document.body.style.overflow=''}},[menu,reel,active]);
