@@ -1,13 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { ArrowDown, Play } from 'lucide-react';
 import './hero.css';
-import BrandMark from './BrandMark';
 
 const Liquid = lazy(() => import('./Liquid'));
 
 export function OriginalLogo() {
   return <a className="original-logo" href="#inicio" aria-label="UNDA Studios — Início">
-    <BrandMark /><span className="brand-divider" aria-hidden="true"/><span className="brand-studios" aria-hidden="true">STUDIOS</span>
+    <img src="/unda-logo.png" alt="UNDA Studios" width="1672" height="941" decoding="async" />
   </a>;
 }
 
@@ -20,7 +19,6 @@ export default function Hero() {
       <Suspense fallback={<div className="wave-fallback" />}><Liquid /></Suspense>
     </div>
     <div className="hero-vignette" aria-hidden="true" />
-    <div className="hero-brand" aria-hidden="true"><BrandMark /></div>
     <span className="hero-cross hero-cross-top" aria-hidden="true" />
     <span className="hero-cross hero-cross-right" aria-hidden="true" />
     <div className="hero-copy">
