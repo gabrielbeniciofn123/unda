@@ -24,17 +24,22 @@ const services = [
 function App(){
  const [menu,setMenu]=useState(false), [filter,setFilter]=useState('Todos'), [active,setActive]=useState<number|null>(null), [service,setService]=useState<number|null>(0), [reel,setReel]=useState(false), [copied,setCopied]=useState(false), [paused,setPaused]=useState(false), [muted,setMuted]=useState(true);
  const [draft,setDraft]=useState(''); const video=useRef<HTMLVideoElement>(null); const modal=useRef<HTMLDialogElement>(null); const projectModal=useRef<HTMLDialogElement>(null);
+ const entryPlayed=useRef(false);
  useEffect(()=>{
   const media=gsap.matchMedia();
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)entryPlayed.current=true;
   media.add('(prefers-reduced-motion: no-preference)',()=>{
+   if(!entryPlayed.current){
+   entryPlayed.current=true;
    const entry=gsap.timeline({defaults:{ease:'power3.out'}});
    entry.from('.unda-header > *',{y:-10,opacity:0,duration:.9,stagger:.07},0)
     .from('.hero-identification',{y:14,opacity:0,duration:.85},.15)
-    .from('.hero-line',{y:22,opacity:0,duration:1.1,stagger:.12},.25)
-    .from('.hero-description, .hero-actions',{y:15,opacity:0,duration:.9,stagger:.12},.55)
+    .fromTo('.hero-line',{y:24,opacity:0,clipPath:'inset(100% -4% -10% -4%)'},{y:0,opacity:1,clipPath:'inset(-10% -4% -10% -4%)',duration:1.3,stagger:.13,clearProps:'clipPath,transform,opacity'},.25)
+    .from('.hero-description, .hero-actions',{y:12,opacity:0,duration:1,stagger:.12},.55)
     .from('.hero-bottom',{opacity:0,duration:1},.85);
-   gsap.to('.unda-hero .hero-copy',{y:-45,opacity:.35,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom 20%',scrub:1.2}});
-   gsap.to('.unda-hero .liquid-art',{y:34,scale:1.025,opacity:.8,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom top',scrub:1.3}});
+   }
+   gsap.to('.unda-hero .hero-copy',{y:-28,opacity:.5,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom 20%',scrub:1.2}});
+   gsap.to('.unda-hero .liquid-art',{y:18,scale:1.01,opacity:.9,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom top',scrub:1.3}});
    gsap.to('.unda-hero .hero-depth',{y:-25,ease:'none',scrollTrigger:{trigger:'.unda-hero',start:'top top',end:'bottom top',scrub:1.5}});
    gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach(el=>gsap.from(el,{y:45,opacity:0,duration:.8,scrollTrigger:{trigger:el,start:'top 92%',once:true}}));
   });
@@ -52,7 +57,6 @@ function App(){
   {menu&&<nav className="mobile-menu unda-mobile-menu" aria-label="Navegação móvel">{nav.map(([name,url])=><a key={url} href={url} onClick={()=>setMenu(false)}>{name}<ArrowUpRight/></a>)}<a href={instagram} target="_blank" rel="noreferrer">Instagram <Instagram/></a></nav>}
   <main id="main">
    <Hero/>
-   <div className="ticker" aria-hidden="true"><div>{Array.from({length:4},(_,i)=><span key={i}>FEITO PARA SENTIR <span className="asterisk">✳</span> CRIADO PARA MOVER <span className="asterisk">✳</span></span>)}</div></div>
    <section className="portfolio section" id="portfolio"><div className="section-top" data-reveal><span className="eyebrow">01 / NOSSO UNIVERSO</span><span className="micro">IDEIAS QUE GANHAM VIDA.</span></div><div className="section-heading" data-reveal><h2>PLAY. SINTA.<br/><span className="serif">REPLAY.</span></h2><div className="section-intro"><p>Cada história tem seu próprio ritmo.<br/>A gente encontra o jeito de fazer você sentir.</p><a className="text-link" href={instagram} target="_blank" rel="noreferrer">TRABALHOS REAIS NO INSTAGRAM <ArrowUpRight size={16}/></a></div></div>
    <div className="portfolio-toolbar"><div className="filters" aria-label="Filtrar galeria">{['Todos','Eventos','Música','Marcas'].map(f=><button key={f} className={filter===f?'selected':''} aria-pressed={filter===f} onClick={()=>setFilter(f)}>{f}{f==='Todos'&&<sup>04</sup>}</button>)}</div><span className="micro visual-note">SELEÇÃO VISUAL CONCEITUAL</span></div>
    <div className="project-grid">{projects.map((p,i)=>filter==='Todos'||filter===p.category?<button className={'project project-'+i} key={p.id} onClick={()=>setActive(i)}><div className="project-image"><img src={p.image} alt={p.title+' — referência visual de '+p.category.toLowerCase()} loading="lazy"/><div className="project-overlay"/><span className="project-tag">{p.category.toUpperCase()}</span><span className="project-play"><ArrowUpRight size={24}/></span><span className="project-number">/{p.id}</span><div className="project-image-title">{p.title}</div></div><div className="project-meta"><span>{p.kind}</span><span>EXPLORAR <ArrowUpRight size={13}/></span></div></button>:null)}</div>
