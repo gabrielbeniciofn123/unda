@@ -36,7 +36,7 @@ export const sculptureProfiles: Station[][] = [
 export function sculptureGeometry(stations: Station[], rows: number, sides: number) {
   const curve = new THREE.CatmullRomCurve3(stations.map(([x, y, z]) => new THREE.Vector3((x - .5) * 17.84, (.5 - y) * 10, z)), false, 'centripetal');
   const profile = new THREE.CatmullRomCurve3(stations.map(p => new THREE.Vector3(p[3], p[4], p[5])), false, 'catmullrom', .35);
-  const positions = [], indices = [];
+  const positions = [], indices = [], thickness = [];
   const normal = new THREE.Vector3(), binormal = new THREE.Vector3();
   for (let i = 0; i <= rows; i++) {
     const t = i / rows;
@@ -57,6 +57,10 @@ export function sculptureGeometry(stations: Station[], rows: number, sides: numb
       const a = u * Math.cos(section.z) - v * Math.sin(section.z);
       const b = u * Math.sin(section.z) + v * Math.cos(section.z);
       positions.push(center.x + normal.x * a + binormal.x * b, center.y + normal.y * a + binormal.y * b, center.z + normal.z * a + binormal.z * b);
+      // Optical depth of the rolled elliptical section, in local scene units.
+      // Keep a positive minimum at the tips for stable volume attenuation.
+      const depth = 2 * Math.hypot(section.x * Math.sin(section.z), section.y * Math.cos(section.z));
+      thickness.push(Math.max(.04, depth * fold * cap));
       if (i < rows && j < sides) {
         const p = i * (sides + 1) + j, q = p + sides + 1;
         indices.push(p, p + 1, q, q, p + 1, q + 1);
@@ -65,6 +69,7 @@ export function sculptureGeometry(stations: Station[], rows: number, sides: numb
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('liquidThickness', new THREE.Float32BufferAttribute(thickness, 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   const normals = geometry.getAttribute('normal');
@@ -74,8 +79,13 @@ export function sculptureGeometry(stations: Station[], rows: number, sides: numb
     normals.setXYZ(a, normal.x, normal.y, normal.z);
     normals.setXYZ(b, normal.x, normal.y, normal.z);
   }
+  // All vertices at either collapsed tip need the same outward normal.
+  for (const row of [0, rows]) {
+    const direction = curve.getTangent(row / rows).multiplyScalar(row === 0 ? -1 : 1);
+    for (let j = 0; j <= sides; j++) normals.setXYZ(row * (sides + 1) + j, direction.x, direction.y, direction.z);
+  }
   geometry.computeBoundingSphere();
-  geometry.boundingSphere!.radius += .15; // Include the shader's animated displacement.
+  geometry.boundingSphere!.radius += .22; // Include all three animated wave modes.
   return geometry;
 }
 

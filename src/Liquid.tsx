@@ -8,7 +8,18 @@ export { prepareAreaLights };
 /** Curved studio cards supply reflected light; they never appear as objects. */
 function studioEnvironment(renderer: THREE.WebGLRenderer) {
   const studio = new THREE.Scene();
-  studio.background = new THREE.Color('#010306');
+  studio.background = new THREE.Color('#111b25');
+  // Feather the light cards so reflections roll off instead of looking painted on.
+  const size = 64, pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const u = (x / (size - 1) - .5) * 2, v = (y / (size - 1) - .5) * 2;
+    const light = Math.round(255 * Math.exp(-4 * (u ** 8 + v ** 8)));
+    const offset = (y * size + x) * 4;
+    pixels.set([light, light, light, 255], offset);
+  }
+  const diffuser = new THREE.DataTexture(pixels, size, size);
+  diffuser.minFilter = diffuser.magFilter = THREE.LinearFilter;
+  diffuser.needsUpdate = true;
   const resources: { geometry: THREE.PlaneGeometry; material: THREE.MeshBasicMaterial }[] = [];
   function softbox(color: string, intensity: number, width: number, height: number, position: number[], roll = 0) {
     const geometry = new THREE.PlaneGeometry(width, height, 20, 6);
@@ -17,26 +28,26 @@ function studioEnvironment(renderer: THREE.WebGLRenderer) {
       const x = points.getX(i), y = points.getY(i);
       points.setZ(i, .35 * Math.sin(x / width * 4) + .25 * Math.cos(y / height * 3));
     }
-    const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide, toneMapped: false });
+    const material = new THREE.MeshBasicMaterial({ map: diffuser, color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide, toneMapped: false });
     const panel = new THREE.Mesh(geometry, material);
     panel.position.set(position[0], position[1], position[2]);
     panel.lookAt(0, 0, 0); panel.rotateZ(roll);
     studio.add(panel); resources.push({ geometry, material });
   }
-  softbox('#edfcff', 7, 1.1, 12, [-4, 3, 5], -.6);
-  softbox('#b7efff', 2.5, 1.8, 9, [5, 2, 2], .7);
-  softbox('#0660ff', 2, .35, 10, [3, -2, 5], -.55);
-  softbox('#edffff', 4.5, 1.1, 7, [3, -2.7, 5], -.55);
-  softbox('#f4ffff', 5, 10, .5, [0, 5, -3], -.3);
-  softbox('#1ce0c0', 1.8, 6, .65, [-2, -5, 1], -.5);
-  softbox('#79d9ff', 2.4, 1.2, 8, [-5, -1, -3], .4);
-  softbox('#ffffff', 4, .38, 8, [2, -1, -5], .7);
-  softbox('#b53d95', .9, 7, .14, [0, -4, 4], .6);
-  softbox('#bdefff', 3.5, 2.1, 3.5, [-.5, -4, 5], -.65);
+  softbox('#f4fbff', 5.5, 2.2, 12, [-4, 3, 5], -.6);
+  softbox('#d9f1ff', 2.8, 3.2, 9, [5, 2, 2], .7);
+  softbox('#78acff', 1.2, .55, 10, [3, -2, 5], -.55);
+  softbox('#edffff', 4, 1.5, 7, [3, -2.7, 5], -.55);
+  softbox('#f4ffff', 4.5, 10, 1.2, [0, 5, -3], -.3);
+  softbox('#8ee2d4', 1.4, 6, 1.1, [-2, -5, 1], -.5);
+  softbox('#b4e5ff', 2, 1.8, 8, [-5, -1, -3], .4);
+  softbox('#ffffff', 3.5, .5, 8, [2, -1, -5], .7);
+  softbox('#d6efff', 2.8, 3, 4.5, [-.5, -4, 5], -.65);
   const pmrem = new THREE.PMREMGenerator(renderer);
   try { return pmrem.fromScene(studio, .035, .1, 60); }
   finally {
     pmrem.dispose();
+    diffuser.dispose();
     resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); });
     studio.clear();
   }
@@ -44,53 +55,73 @@ function studioEnvironment(renderer: THREE.WebGLRenderer) {
 
 function glassMaterial(time: { value: number }, index: number) {
   const material = new THREE.MeshPhysicalMaterial({
-    color: '#597881', metalness: .68, roughness: .055,
-    transmission: .88, thickness: 1.2, ior: 1.48,
-    attenuationColor: new THREE.Color('#5bb2c1'), attenuationDistance: 4.2,
-    envMapIntensity: 1.45, clearcoat: 1, clearcoatRoughness: .045,
-    iridescence: .12, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 280],
+    color: '#edf8fa', metalness: 0, roughness: .075,
+    transmission: .96, thickness: 1, ior: 1.46,
+    attenuationColor: new THREE.Color('#73b9c5'), attenuationDistance: 2.8,
+    envMapIntensity: 1.25, clearcoat: .18, clearcoatRoughness: .09,
     side: THREE.DoubleSide,
   });
   material.onBeforeCompile = shader => {
     shader.uniforms.uFlowTime = time;
     shader.uniforms.uFlowPhase = { value: index * 2.4 };
-    shader.uniforms.uFlowSpeed = { value: index === 0 ? .15 : .12 };
+    shader.uniforms.uFlowSpeed = { value: index === 0 ? .32 : .27 };
     shader.vertexShader = `
       uniform float uFlowTime;
       uniform float uFlowPhase;
       uniform float uFlowSpeed;
+      attribute float liquidThickness;
       varying vec3 vSculpturePosition;
+      varying float vLiquidThickness;
+      const vec3 swellDirection = vec3(.48, .32, .18);
+      const vec3 crossDirection = vec3(-.35, .82, .24);
+      const vec3 rippleDirection = vec3(1.6, .9, -.3);
+      const vec3 swellAmplitude = vec3(.025, .065, .105);
+      const vec3 crossAmplitude = vec3(.018, .028, .042);
+      const vec3 rippleAmplitude = vec3(.002, .004, .008);
       vec3 liquidFlow(vec3 p) {
         float t = uFlowTime * uFlowSpeed + uFlowPhase;
-        return p + vec3(.025 * sin(p.y * .9 + t), .045 * sin(p.x * .85 + t * .8), .085 * sin(p.y * .7 + p.x * .65 + t * .9));
+        return p + swellAmplitude * sin(dot(p, swellDirection) - t)
+          + crossAmplitude * sin(dot(p, crossDirection) + t * .73 + 1.4)
+          + rippleAmplitude * sin(dot(p, rippleDirection) - t * 1.23 + .6);
+      }
+      mat3 flowDerivative(vec3 amplitude, vec3 direction, float phase) {
+        return mat3(amplitude * direction.x, amplitude * direction.y, amplitude * direction.z) * cos(phase);
       }
       mat3 liquidJacobian(vec3 p) {
         float t = uFlowTime * uFlowSpeed + uFlowPhase;
-        float dz = .085 * cos(p.y * .7 + p.x * .65 + t * .9);
-        return mat3(vec3(1., .03825 * cos(p.x * .85 + t * .8), dz * .65), vec3(.0225 * cos(p.y * .9 + t), 1., dz * .7), vec3(0., 0., 1.));
+        return mat3(1.) + flowDerivative(swellAmplitude, swellDirection, dot(p, swellDirection) - t)
+          + flowDerivative(crossAmplitude, crossDirection, dot(p, crossDirection) + t * .73 + 1.4)
+          + flowDerivative(rippleAmplitude, rippleDirection, dot(p, rippleDirection) - t * 1.23 + .6);
       }
     ` + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
       #include <beginnormal_vertex>
       mat3 flowJ = liquidJacobian(position);
       objectNormal = normalize(mat3(cross(flowJ[1], flowJ[2]), cross(flowJ[2], flowJ[0]), cross(flowJ[0], flowJ[1])) * objectNormal);
-    `).replace('#include <begin_vertex>', 'vec3 transformed = liquidFlow(position); vSculpturePosition = transformed;');
-    // Internal studio refraction complements screen-space transmission on the
-    // transparent canvas; Fresnel opacity keeps thick edges substantial.
-    shader.fragmentShader = 'varying vec3 vSculpturePosition;\n' + shader.fragmentShader;
+    `).replace('#include <begin_vertex>', 'vec3 transformed = liquidFlow(position); vSculpturePosition = transformed; vLiquidThickness = liquidThickness;');
+    // Match absorption to each section's depth; thin folds remain clearer.
+    // The orthographic camera has parallel viewing rays, unlike perspective.
+    const transmission = THREE.ShaderChunk.transmission_fragment
+      .replace('material.thickness = thickness;', 'material.thickness = thickness * vLiquidThickness;')
+      .replace('vec3 v = normalize( cameraPosition - pos );', 'vec3 v = isOrthographic ? inverseTransformDirection(vec3(0., 0., 1.), viewMatrix) : normalize(cameraPosition - pos);');
+    shader.fragmentShader = 'varying vec3 vSculpturePosition;\nvarying float vLiquidThickness;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_fragment>', `
-      #include <transmission_fragment>
+      ${transmission}
       #ifdef USE_TRANSMISSION
         vec3 glassRay = refract(-v, n, 1.0 / material.ior);
-        vec3 internalLight = textureCubeUV(envMap, envMapRotation * glassRay, .1).rgb;
+        vec3 internalLight = textureCubeUV(envMap, envMapRotation * glassRay, material.roughness).rgb;
         vec3 absorption = volumeAttenuation(material.thickness, material.attenuationColor, material.attenuationDistance);
-        float facing = abs(dot(n, v));
-        totalDiffuse += internalLight * absorption * material.transmission * .055;
-        material.transmissionAlpha = mix(.9, material.transmissionAlpha, smoothstep(.08, .8, facing));
+        float facing = clamp(abs(dot(n, v)), 0., 1.);
+        float f0 = pow((material.ior - 1.) / (material.ior + 1.), 2.);
+        float fresnel = f0 + (1. - f0) * pow(1. - facing, 5.);
+        // A CSS backdrop cannot be sampled by WebGL; the studio supplies the
+        // missing transmitted light without replacing the physical reflections.
+        totalDiffuse += internalLight * absorption * material.transmission * (1. - fresnel) * .18;
+        material.transmissionAlpha = max(fresnel, material.transmissionAlpha);
       #endif
     `).replace('#include <opaque_fragment>', `
       // The left side recedes into the unlit stage behind the copy.
-      float stageLight = mix(.16, 1., smoothstep(-4.5, 1.4, vSculpturePosition.x));
+      float stageLight = mix(.28, 1., smoothstep(-4.5, 1.4, vSculpturePosition.x));
       outgoingLight *= stageLight;
       #include <opaque_fragment>
     `);
